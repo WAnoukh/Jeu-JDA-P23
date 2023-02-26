@@ -16,7 +16,7 @@ fpsClock = pg.time.Clock()
 WINDOW_WIDTH = 1200
 WINDOW_HEIGHT = 900
 
-WINDOW = pg.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+WINDOW = pg.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.FULLSCREEN, vsync=1)
 pg.display.set_caption('Runner')
 
 delta_time = 0
@@ -81,6 +81,7 @@ class Game:
                 self.pSpeedX = -self.pWallJumpBoost * self.pLastWallDir
                 self.jumpRequested = False
                 self.pLastWalled = -100000
+
 
         elif jumpKeyRELEASED:
             self.jumpRequested = False
