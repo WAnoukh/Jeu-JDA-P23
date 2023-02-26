@@ -81,7 +81,7 @@ class Game:
                 self.pSpeedX = -self.pWallJumpBoost * self.pLastWallDir
                 self.jumpRequested = False
                 self.pLastWalled = -100000
-                
+
         elif jumpKeyRELEASED:
             self.jumpRequested = False
 
