@@ -1,4 +1,3 @@
-import pygame
 import pygame as pg
 import sys
 from functions import *
@@ -11,13 +10,17 @@ pg.init()
 BACKGROUND = (255, 255, 255)
 
 # Game Setup
-FPS = 165
+FPS = 160
 fpsClock = pg.time.Clock()
 WINDOW_WIDTH = 1200
 WINDOW_HEIGHT = 900
-
-WINDOW = pg.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.FULLSCREEN, vsync=1)
+SCREENMODE = pg.RESIZABLE
+SCREENMODE = pg.FULLSCREEN
+WINDOW = pg.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), SCREENMODE, vsync=1)
 pg.display.set_caption('Runner')
+
+pg.font.init()
+my_font = pg.font.SysFont('Arial', 10)
 
 delta_time = 0
 
@@ -81,8 +84,6 @@ class Game:
                 self.pSpeedX = -self.pWallJumpBoost * self.pLastWallDir
                 self.jumpRequested = False
                 self.pLastWalled = -100000
-
-
         elif jumpKeyRELEASED:
             self.jumpRequested = False
 
@@ -200,24 +201,23 @@ def main():
             if event.type == QUIT:
                 pg.quit()
                 sys.exit()
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_UP:
+            elif event.type == pg.KEYDOWN:
+                if event.key == pg.K_UP:
                     jumpKeyDOWN = True
                     jumpKeyPRESSED = True
-                elif event.key == pygame.K_RIGHT:
+                elif event.key == pg.K_RIGHT:
                     horizontalInput += 1
-                elif event.key == pygame.K_LEFT:
+                elif event.key == pg.K_LEFT:
                     horizontalInput -= 1
-            elif event.type == pygame.KEYUP:
-                if event.key == pygame.K_UP:
+            elif event.type == pg.KEYUP:
+                if event.key == pg.K_UP:
                     jumpKeyDOWN = False
                     jumpKeyRELEASED = True
-                elif event.key == pygame.K_RIGHT:
+                elif event.key == pg.K_RIGHT:
                     horizontalInput -= 1
-                elif event.key == pygame.K_LEFT:
+                elif event.key == pg.K_LEFT:
                     horizontalInput += 1
         game.Loop()
-
         pg.display.update()
         delta_time = fpsClock.tick(FPS) / 1000
 
