@@ -30,25 +30,32 @@ class Game:
         self.pSpeedX = 0
         self.pSpeedY = 0
 
+        self.jumpRequested = False
+
         self.pLanded = False
         self.pLastLanded = -5000
         self.pJumpOffset = 0.1
-        self.jumpRequested = False
         self.pJumpForce = 1000
         self.gravity = 2000
+
+        self.pIsWallTouching = 0  # 0 for False and 1 or -1 according to the side
+        self.pWallSlidingRate = 0.9
+        self.pLastWalled = -5000
+        self.pLastWallDir = 0
+        self.pWallJumpOffset = 0.15
+        self.pWallJumpBoost = 200
 
         self.pMovSpeed = 400
         self.pMovAcc = 0.2
         self.pMovDec = 0.3
 
-        self.walls = [Wall(0, 0, 500, 200)]
+        self.walls = [Wall(0, 0, 500, 200), Wall(500, -400, 500, 600), Wall(-500, -400, 500, 600)]
 
         self.MainCamera = Camera(self.player.x, self.player.y, WINDOW_WIDTH, WINDOW_HEIGHT)
         self.camDesiredX = self.player.x
         self.camDesiredY = self.player.y
 
     def Update(self):
-
         # Landed
         self.pLanded = not self.place_free(self.player, self.player.x, self.player.y + 1)
         if self.pLanded:
@@ -57,14 +64,30 @@ class Game:
         # Gravity
         self.pSpeedY += self.gravity * delta_time
 
+        # Wall Slide
+        self.pIsWallTouching = (not self.place_free(self.player, self.player.x + 1, self.player.y)) - (
+            not self.place_free(self.player, self.player.x - 1, self.player.y))
+        if self.pIsWallTouching != 0:
+            self.pLastWallDir = self.pIsWallTouching
+            self.pLastWalled = pg.time.get_ticks()
+        if self.pIsWallTouching != 0 and horizontalInput == self.pIsWallTouching and self.pSpeedY > 0:
+            self.pSpeedY *= self.pWallSlidingRate
+
         # Jump
         if jumpKeyPRESSED:
             self.jumpRequested = True
-        # elif jumpKeyDOWN :
-        #    self.jumpRequested = False
+            if (pg.time.get_ticks() - self.pLastWalled) / 1000 < self.pWallJumpOffset and not self.pLanded:
+                self.pSpeedY = -self.pJumpForce
+                self.pSpeedX = -self.pWallJumpBoost * self.pLastWallDir
+                self.jumpRequested = False
+                self.pLastWalled = -100000
+                
+        elif jumpKeyRELEASED:
+            self.jumpRequested = False
+
         if self.jumpRequested:
             timer = pg.time.get_ticks()
-            if (timer - self.pLastLanded) / 1000 < self.pJumpOffset and self.jumpRequested:
+            if (timer - self.pLastLanded) / 1000 < self.pJumpOffset:
                 self.pSpeedY = -self.pJumpForce
                 self.jumpRequested = False
                 self.pLastLanded = -100000
@@ -76,8 +99,7 @@ class Game:
         self.pSpeedX = clamp(self.pSpeedX, -self.pMovSpeed, self.pMovSpeed)
         if horizontalInput == 0:
             self.pSpeedX = Annulate(self.pSpeedX, (self.pMovSpeed / self.pMovDec) * delta_time)
-        else:
-            pass
+
         # Player Applying speed
         pSpeedXdt = self.pSpeedX * delta_time
         pSpeedYdt = self.pSpeedY * delta_time
@@ -172,7 +194,7 @@ def main():
     while looping:
         # Get inputs
         jumpKeyPRESSED = False
-        jumpKeyRELEASED = True
+        jumpKeyRELEASED = False
         for event in pg.event.get():
             if event.type == QUIT:
                 pg.quit()
@@ -188,6 +210,7 @@ def main():
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_UP:
                     jumpKeyDOWN = False
+                    jumpKeyRELEASED = True
                 elif event.key == pygame.K_RIGHT:
                     horizontalInput -= 1
                 elif event.key == pygame.K_LEFT:
