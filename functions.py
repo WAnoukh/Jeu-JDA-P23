@@ -27,3 +27,26 @@ def clamp(v, mi, ma):
 
 def Annulate(val, amount):
     return max(0, abs(val) - amount) * sign(val)
+
+
+def Approach(fromVal, toVal, amount):
+    if abs(toVal - fromVal) < amount:
+        return toVal
+    else:
+        return fromVal + sign(toVal - fromVal) * amount
+
+
+def SmoothStep(t, t1, t2):
+    k = clamp((t - t1) / (t2 - t1), 0, 1)
+    return k * k * (3 - 2 * k)
+
+
+def SmoothLerp(start, end, t, t1, t2):
+    return lerp(start, end, SmoothStep(t, t1, t2))
+
+
+from random import random
+
+
+def randomRange(a, b):
+    return a + (b - a) * random()
