@@ -1,10 +1,10 @@
 from math import ceil
 import pygame as pg
-from Game import *
 from functions import *
 
 
 class Entity:
+    id = 0
     sizeX = 1
     sizeY = 1
     visible = True
@@ -12,21 +12,24 @@ class Entity:
     pivotX = 0.5
     pivotY = 0.5
     color = (255, 105, 180)
+    game = None
 
-    def __init__(self, x, y):
+    def __init__(self, x, y, game):
         self.x = x
         self.y = y
+        self.game = game
 
     def Update(self, game):
         pass
 
     def draw(self, window, camera):
-        sizeX, sizeY = self.sizeX*camera.zoom, self.sizeY*camera.zoom
+        sizeX, sizeY = self.sizeX * camera.zoom, self.sizeY * camera.zoom
         offsetX = sizeX * self.pivotX
         offsetY = sizeY * self.pivotY
-        x, y = camera.WorldToScreen(self.x , self.y )
+        x, y = camera.WorldToScreen(self.x, self.y)
         pg.draw.rect(window, self.color,
-                     pg.Rect(x - offsetX, y- offsetY, sizeX, sizeY))
+                     pg.Rect(x - offsetX, y - offsetY, sizeX, sizeY))
+        self.game.printTextOnScreen(self.id, x, y)
 
     def GetTopLeftPoint(self):
         return self.x - self.sizeX * self.pivotX, self.y - self.sizeY * self.pivotY
@@ -34,6 +37,22 @@ class Entity:
     def PointCollide(self, x, y):
         wx, wy = self.GetTopLeftPoint()
         return (wx < x < wx + self.sizeX) and (wy < y < wy + self.sizeY)
+
+    def BoxCollide(self, x1, y1, x2, y2):
+        sx1, sy1 = self.GetTopLeftPoint()
+        sx2, sy2 = sx1 + self.sizeX, sy1 + self.sizeY
+        if self.PointCollide(x1, y1) or self.PointCollide(x2, y1) or self.PointCollide(x1, y2) or \
+                self.PointCollide(x2, y2):
+            return True
+        if sx1 <= x1 <= sx2 or sx1 <= x2 <= sx2:
+            if y1 <= sy1 and sy2 <= y2:
+                return True
+        if sy1 <= y1 <= sy2 or sy1 <= y2 <= sy2:
+            if x1 <= sx1 and sx2 <= x2:
+                return True
+        if y1 < sy1 and sy2 < y2 and x1 < sx1 and sx2 < x2:
+            return True
+        return False
 
 
 class Wall(Entity):
@@ -45,8 +64,8 @@ class Wall(Entity):
     startSizeX = 0
     startSizeY = 0
 
-    def __init__(self, x, y, sizeX, sizeY, dx=None, dy=None, dsx=None, dsy=None):
-        super().__init__(x, y)
+    def __init__(self, x, y, sizeX, sizeY, game, dx=None, dy=None, dsx=None, dsy=None):
+        super().__init__(x, y, game)
         self.pivotX = 0.5
         self.pivotY = 0
         self.sizeX = sizeX
@@ -110,17 +129,12 @@ class Player(Entity):
     wallSlidingRate = 0.9
     lastWalled = -5000
     lastWallDir = 0
-    wallJumpOffset = 0.15
+    wallJumpOffset = 0.13
     wallJumpBoost = 200
 
     movSpeed = 600
     movAcc = 0.2
     movDec = 0.3
-
-    def __init__(self, x, y):
-        super().__init__(x, y)
-        self.x = x
-        self.y = y
 
     def Update(self, game):
         # Landed
@@ -204,23 +218,28 @@ class Player(Entity):
             if xDone and yDone:
                 break
 
+        print(self.ySpeed)
         self.x += xStep * xSpeedDir
-        if self.ySpeed == 0:
+        if yStep == 0:
+            pass
             self.y = ceil(self.y)
         else:
             self.y += yStep * ySpeedDir
+
+        while not game.place_free(self,self.x,self.y):
+            self.y -= 1
 
 
 class Camera:
     def __init__(self, x, y, WINDOW_WIDTH, WINDOW_HEIGHT):
         self.x = x
         self.y = y
-        self.zoom = 0.3
+        self.zoom = 1
         self.WINDOW_WIDTH = WINDOW_WIDTH
         self.WINDOW_HEIGHT = WINDOW_HEIGHT
 
     def WorldToScreen(self, x, y):
-        return (x - self.x)*self.zoom + self.WINDOW_WIDTH / 2, (y - self.y)*self.zoom + self.WINDOW_HEIGHT / 2
+        return (x - self.x) * self.zoom + self.WINDOW_WIDTH / 2, (y - self.y) * self.zoom + self.WINDOW_HEIGHT / 2
 
     def ScreenToWorld(self, x, y):
-        return (x - self.WINDOW_WIDTH / 2 )/self.zoom + self.x , (y - self.WINDOW_HEIGHT / 2)/self.zoom + self.y
+        return (x - self.WINDOW_WIDTH / 2) / self.zoom + self.x, (y - self.WINDOW_HEIGHT / 2) / self.zoom + self.y

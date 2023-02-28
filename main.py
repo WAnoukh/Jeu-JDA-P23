@@ -6,12 +6,12 @@ from Game import *
 pg.init()
 
 # Game Setup
-FPS = 160
+FPS = 60
 fpsClock = pg.time.Clock()
 WINDOW_WIDTH = 1200
 WINDOW_HEIGHT = 900
 SCREENMODE = pg.RESIZABLE
-#SCREENMODE = pg.FULLSCREEN
+# SCREENMODE = pg.FULLSCREEN
 WINDOW = pg.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), SCREENMODE, vsync=1)
 pg.display.set_caption('Runner')
 
@@ -21,11 +21,15 @@ my_font = pg.font.SysFont('Arial', 10)
 delta_time = 0
 
 
+
+
+
 # The main function that controls the game
 def main():
     global delta_time
     looping = True
     game = Game(WINDOW, WINDOW_WIDTH, WINDOW_HEIGHT)
+    game.font = my_font
 
     # The main game loop
     while looping:
@@ -46,7 +50,11 @@ def main():
                     game.horizontalInput -= 1
                 elif event.key == pg.K_SPACE:
                     game.GenerateFromWall(game.walls[0])
-                    print("regenerated")
+                elif event.key == pg.K_r:
+                    game.Start()
+                elif event.key == pg.K_ESCAPE:
+                    pg.quit()
+                    sys.exit()
             elif event.type == pg.KEYUP:
                 if event.key == pg.K_UP:
                     game.jumpKeyDOWN = False
@@ -55,6 +63,7 @@ def main():
                     game.horizontalInput -= 1
                 elif event.key == pg.K_LEFT:
                     game.horizontalInput += 1
+
         game.Loop()
         pg.display.update()
         game.delta_time = fpsClock.tick(FPS) / 1000

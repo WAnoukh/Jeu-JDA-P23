@@ -12,3 +12,5 @@ pyinstaller -F votrepath/main.py
 
 * Déplacement horizontal : KEY_LEFT - KEY_RIGHT
 * Saut : KEY_UP
+* Réinitialiser le jeu : R
+* Lancer une nouvelle génération avec les blocks qui font des trucs stylés : Espace
