@@ -37,7 +37,7 @@ class Game:
         self.WINDOW = window
 
         self.wallTexturePath = ".\\9Sided_Wall.png"
-        self.wallTexture = Texture_9Sided(self.wallTexturePath, 6, 6,6,6)
+        self.wallTexture = Texture_9Sided(self.wallTexturePath, 6, 6, 6, 6, 2)
 
         self.Start()
 
@@ -49,7 +49,8 @@ class Game:
         self.camDesiredX = self.player.x
         self.camDesiredY = self.player.y
 
-        firstWall = Wall(0, baseLevel, 200, round(200 / 1.6), self, dy=baseLevel)
+        w, h = self.wallTexture.GetSize(2, 1)
+        firstWall = Wall(0, baseLevel, w, h, self, dy=baseLevel)
         self.firstGeneration = True
         self.GenerateFromWall(firstWall)
         for wall in self.walls:
@@ -138,7 +139,12 @@ class Game:
                 cumulatedTime += simuDeltaTime
             if collided:
                 continue
-            h, w = randint(30, 500), randint(26, 500)
+            w, h = randint(0, 10), randint(0, 20)
+            if h== 0 or w==0 and random()<0.85:
+                w, h = randint(1, 10), randint(1, 20)
+            print(w, h)
+            w, h = self.wallTexture.GetSize(w, h)
+            print(h, w)
             x, y = round(x), round(y)
             newWall = Wall(x, y, w + self.player.sizeX, h + self.player.sizeY,
                            self, dx=x, dy=y, dsx=w, dsy=h)
@@ -148,7 +154,6 @@ class Game:
             newWall.id = i + 1
             i += 1
         if self.firstGeneration:
-
             for i in range(len(self.newWalls)):
                 newWall = self.newWalls[i]
                 newWall.y = 1000

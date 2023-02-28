@@ -71,8 +71,12 @@ class Wall(Entity):
         super().__init__(x, y, game)
         self.pivotX = 0.5
         self.pivotY = 0
+
+        self.texture = game.wallTexture
+
         self.sizeX = sizeX
         self.sizeY = sizeY
+
         self.color = (200, 200, 200)
 
         self.desiredX = x if dx is None else dx
@@ -80,7 +84,7 @@ class Wall(Entity):
         self.desiredSizeX = sizeX if dsx is None else dsx
         self.desiredSizeY = sizeY if dsy is None else dsy
 
-        self.texture = game.wallTexture
+
 
     def StartMorph(self, duration=None):
         self.placed = False
@@ -99,15 +103,22 @@ class Wall(Entity):
             if curTime >= endTime:
                 self.placed = True
 
+
             self.x = SmoothLerp(self.startX, self.desiredX, curTime, self.morphStart, endTime)
             self.y = SmoothLerp(self.startY, self.desiredY, curTime, self.morphStart, endTime)
-            self.sizeX = SmoothLerp(self.startSizeX, self.desiredSizeX, curTime, self.morphStart, endTime)
-            self.sizeY = SmoothLerp(self.startSizeY, self.desiredSizeY, curTime, self.morphStart, endTime)
+            if self.sizeX != self.desiredSizeX:
+                self.sizeX = SmoothLerp(self.startSizeX, self.desiredSizeX, curTime, self.morphStart, endTime)
+            if self.sizeY != self.desiredSizeY:
+                self.sizeY = SmoothLerp(self.startSizeY, self.desiredSizeY, curTime, self.morphStart, endTime)
 
     def Draw(self, window, camera):
-        x, y = super().Draw(window, camera)
+        sizeX, sizeY = self.sizeX * camera.zoom, self.sizeY * camera.zoom
+        offsetX = sizeX * self.pivotX
+        offsetY = sizeY * self.pivotY
+        x, y = camera.WorldToScreen(self.x, self.y)
+        x, y = x-offsetX, y-offsetY
         if self.texture is not None:
-            print(self.id,self.texture.Draw(window, x, y, self.sizeX, self.sizeY, 3*camera.zoom))
+            self.texture.Draw(window, x, y, self.sizeX, self.sizeY, camera)
             self.game.printTextOnScreen(self.id, x, y)
         pass
 
@@ -245,7 +256,7 @@ class Camera:
     def __init__(self, x, y, WINDOW_WIDTH, WINDOW_HEIGHT):
         self.x = x
         self.y = y
-        self.zoom = 1
+        self.zoom = 0.5
         self.WINDOW_WIDTH = WINDOW_WIDTH
         self.WINDOW_HEIGHT = WINDOW_HEIGHT
 
