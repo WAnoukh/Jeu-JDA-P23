@@ -1,5 +1,7 @@
 from math import ceil
 import pygame as pg
+import pygame.transform
+
 from functions import *
 from Texture import *
 
@@ -84,8 +86,6 @@ class Wall(Entity):
         self.desiredSizeX = sizeX if dsx is None else dsx
         self.desiredSizeY = sizeY if dsy is None else dsy
 
-
-
     def StartMorph(self, duration=None):
         self.placed = False
         if duration is not None:
@@ -103,7 +103,6 @@ class Wall(Entity):
             if curTime >= endTime:
                 self.placed = True
 
-
             self.x = SmoothLerp(self.startX, self.desiredX, curTime, self.morphStart, endTime)
             self.y = SmoothLerp(self.startY, self.desiredY, curTime, self.morphStart, endTime)
             if self.sizeX != self.desiredSizeX:
@@ -116,7 +115,7 @@ class Wall(Entity):
         offsetX = sizeX * self.pivotX
         offsetY = sizeY * self.pivotY
         x, y = camera.WorldToScreen(self.x, self.y)
-        x, y = x-offsetX, y-offsetY
+        x, y = x - offsetX, y - offsetY
         if self.texture is not None:
             self.texture.Draw(window, x, y, self.sizeX, self.sizeY, camera)
             self.game.printTextOnScreen(self.id, x, y)
@@ -134,8 +133,8 @@ class Player(Entity):
     pivotX = 0.5
     pivotY = 1
     color = (200, 0, 0)
-    sizeY = 25
-    sizeX = 25
+    sizeY = 12 * 2
+    sizeX = 9
 
     xSpeed = 0
     ySpeed = 0
@@ -145,8 +144,8 @@ class Player(Entity):
     landed = False
     lastLanded = -5000
     jumpOffset = 0.1
-    jumpForce = 1000
-    gravity = 2000
+    jumpForce = 800
+    gravity = 1800
 
     isWallTouching = 0  # 0 for False and 1 or -1 according to the side
     wallSlidingRate = 0.9
@@ -155,9 +154,16 @@ class Player(Entity):
     wallJumpOffset = 0.13
     wallJumpBoost = 200
 
-    movSpeed = 600
+    movSpeed = 400
     movAcc = 0.2
     movDec = 0.3
+
+    lastHorizontalInput = 1
+
+    def __init__(self, x, y, game):
+        super().__init__(x, y, game)
+        animations = ConvertPlayerSpriteSheet("SpriteSheet_Player.png")
+        self.idleAnim, self.runAnim, self.jumpAnim, self.fallAnim, self.slideAnim = animations
 
     def Update(self, game):
         # Landed
@@ -251,12 +257,45 @@ class Player(Entity):
         while not game.place_free(self, self.x, self.y):
             self.y -= 1
 
+        if self.game.horizontalInput !=0:
+            self.lastHorizontalInput = self.game.horizontalInput
+
+    def Draw(self, window, camera):
+        animSpeed = 0.2
+        #super().Draw(window, camera)
+        if self.landed:
+            if self.xSpeed != 0:
+                curAnimation = self.runAnim
+            else:
+                curAnimation = self.idleAnim
+                animSpeed = 1
+        else:
+            if self.isWallTouching == self.game.horizontalInput != 0:
+                curAnimation = self.slideAnim
+            else:
+                if self.ySpeed < 0:
+                    curAnimation = self.jumpAnim
+                else:
+                    curAnimation = self.fallAnim
+        print(curAnimation)
+
+
+        frame = curAnimation[floor(pg.time.get_ticks() / animSpeed / 1000) % len(curAnimation)]
+        x, y = self.x, self.y
+        x, y = camera.WorldToScreen(x, y)
+
+        w, h = frame.get_size()
+        w, h = w * self.game.texturePixelScale * camera.zoom, h * self.game.texturePixelScale * camera.zoom
+        frame = pygame.transform.flip(frame, self.lastHorizontalInput < 0, 0)
+        window.blit(pg.transform.scale_by(frame, self.game.texturePixelScale * camera.zoom),
+                    (x - w / 2, y - h))
+
 
 class Camera:
     def __init__(self, x, y, WINDOW_WIDTH, WINDOW_HEIGHT):
         self.x = x
         self.y = y
-        self.zoom = 0.5
+        self.zoom = 2
         self.WINDOW_WIDTH = WINDOW_WIDTH
         self.WINDOW_HEIGHT = WINDOW_HEIGHT
 

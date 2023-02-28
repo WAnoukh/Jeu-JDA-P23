@@ -1,4 +1,4 @@
-from math import floor
+from math import floor, sin
 
 from entity import Camera, Player, Wall, Entity
 from functions import lerpDt, randomRange, clamp
@@ -30,6 +30,8 @@ class Game:
 
     wallTexture = None
 
+    texturePixelScale = 2
+
     def __init__(self, window, WINDOW_WIDTH, WINDOW_HEIGHT):
         self.wasplaced = None
         self.WINDOW_WIDTH = WINDOW_WIDTH
@@ -37,7 +39,7 @@ class Game:
         self.WINDOW = window
 
         self.wallTexturePath = ".\\9Sided_Wall.png"
-        self.wallTexture = Texture_9Sided(self.wallTexturePath, 6, 6, 6, 6, 2)
+        self.wallTexture = Texture_9Sided(self.wallTexturePath, 6, 6, 6, 6, self.texturePixelScale)
 
         self.Start()
 
@@ -58,6 +60,7 @@ class Game:
         self.wasplaced = False
 
     def Update(self):
+
         if self.allPlaced:
             self.player.Update(self)
             if not self.wasplaced:
@@ -74,15 +77,16 @@ class Game:
                     wall.Update(self)
 
         # camera
-        self.camDesiredX = lerpDt(self.camDesiredX, self.player.x, 0.9, self.delta_time)
-        self.camDesiredY = lerpDt(self.camDesiredY, self.player.y, 0.9, self.delta_time)
+        #self.MainCamera.zoom = sin(pg.time.get_ticks() / 1000) * 0.5 + 1
+        self.camDesiredX = lerpDt(self.camDesiredX, self.player.x, 0.9, self.delta_time * self.MainCamera.zoom)
+        self.camDesiredY = lerpDt(self.camDesiredY, self.player.y, 0.9, self.delta_time * self.MainCamera.zoom)
         self.MainCamera.x = round(self.camDesiredX)
         self.MainCamera.y = round(self.camDesiredY)
         if self.player.y > 1000:
             self.Start()
 
     def Draw(self):
-        self.WINDOW.fill((170, 200, 255))
+        self.WINDOW.fill((30, 40, 60))
         i = 0
         for wall in self.walls:
             wall.Draw(self.WINDOW, self.MainCamera)
@@ -140,7 +144,7 @@ class Game:
             if collided:
                 continue
             w, h = randint(0, 10), randint(0, 20)
-            if h== 0 or w==0 and random()<0.85:
+            if h == 0 or w == 0 and random() < 0.85:
                 w, h = randint(1, 10), randint(1, 20)
             print(w, h)
             w, h = self.wallTexture.GetSize(w, h)
