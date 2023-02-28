@@ -22,6 +22,25 @@ def ConvertTo9Sided(path, lMargin, uMargin, rMargin, bMargin):
     return outImgs, width, height
 
 
+def ConvertPlayerSpriteSheet(path):
+    inImg = Image.open(path)
+    sw, sh = 9, 12
+    idleLength = 4
+    runLength = 2
+    jumpLength = 4
+    fallLength = 2
+    slideLength = 1
+    idleAnim, runAnim, jumpAnim, fallAnim, slideAnim = [], [], [], [], []
+    y = 0
+    for anim, length in [(idleAnim, idleLength), (runAnim, runLength), (jumpAnim, jumpLength), (fallAnim, fallLength),
+                         (slideAnim, slideLength)]:
+        for i in range(length):
+            cutImg = inImg.crop((sw * i, y, sw * (i + 1), y + sh))
+            anim.append(pilImageToSurface(cutImg))
+        y += sh
+    return idleAnim, runAnim, jumpAnim, fallAnim, slideAnim
+
+
 class Texture_9Sided:
     def __init__(self, path, lMargin, tMargin, rMargin, bMargin, scale):
         self.textures, self.w, self.h = ConvertTo9Sided(path, lMargin, tMargin, rMargin, bMargin)
@@ -32,7 +51,6 @@ class Texture_9Sided:
         x = ceil(((self.w - (self.rMargin + self.lMargin)) * xRepetitions + (self.rMargin + self.lMargin)) * self.scale)
         y = ceil(((self.h - (self.tMargin + self.bMargin)) * yRepetitions + (self.tMargin + self.bMargin)) * self.scale)
         return x, y
-
 
     def Draw(self, window, x, y, sizeX, sizeY, camera):
         scale = self.scale * camera.zoom
