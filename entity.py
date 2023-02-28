@@ -1,6 +1,7 @@
 from math import ceil
 import pygame as pg
 from functions import *
+from Texture import *
 
 
 class Entity:
@@ -22,7 +23,7 @@ class Entity:
     def Update(self, game):
         pass
 
-    def draw(self, window, camera):
+    def Draw(self, window, camera):
         sizeX, sizeY = self.sizeX * camera.zoom, self.sizeY * camera.zoom
         offsetX = sizeX * self.pivotX
         offsetY = sizeY * self.pivotY
@@ -30,6 +31,7 @@ class Entity:
         pg.draw.rect(window, self.color,
                      pg.Rect(x - offsetX, y - offsetY, sizeX, sizeY))
         self.game.printTextOnScreen(self.id, x, y)
+        return x - offsetX, y - offsetY
 
     def GetTopLeftPoint(self):
         return self.x - self.sizeX * self.pivotX, self.y - self.sizeY * self.pivotY
@@ -63,6 +65,7 @@ class Wall(Entity):
     startY = 0
     startSizeX = 0
     startSizeY = 0
+    texture = None
 
     def __init__(self, x, y, sizeX, sizeY, game, dx=None, dy=None, dsx=None, dsy=None):
         super().__init__(x, y, game)
@@ -76,6 +79,8 @@ class Wall(Entity):
         self.desiredY = y if dy is None else dy
         self.desiredSizeX = sizeX if dsx is None else dsx
         self.desiredSizeY = sizeY if dsy is None else dsy
+
+        self.texture = game.wallTexture
 
     def StartMorph(self, duration=None):
         self.placed = False
@@ -98,6 +103,13 @@ class Wall(Entity):
             self.y = SmoothLerp(self.startY, self.desiredY, curTime, self.morphStart, endTime)
             self.sizeX = SmoothLerp(self.startSizeX, self.desiredSizeX, curTime, self.morphStart, endTime)
             self.sizeY = SmoothLerp(self.startSizeY, self.desiredSizeY, curTime, self.morphStart, endTime)
+
+    def Draw(self, window, camera):
+        x, y = super().Draw(window, camera)
+        if self.texture is not None:
+            print(self.id,self.texture.Draw(window, x, y, self.sizeX, self.sizeY, 3*camera.zoom))
+            self.game.printTextOnScreen(self.id, x, y)
+        pass
 
     def GetDesiredTopLeftPoint(self):
         return self.desiredX - self.desiredSizeX * self.pivotX, self.desiredY - self.desiredSizeY * self.pivotY
@@ -218,7 +230,6 @@ class Player(Entity):
             if xDone and yDone:
                 break
 
-        print(self.ySpeed)
         self.x += xStep * xSpeedDir
         if yStep == 0:
             pass
@@ -226,7 +237,7 @@ class Player(Entity):
         else:
             self.y += yStep * ySpeedDir
 
-        while not game.place_free(self,self.x,self.y):
+        while not game.place_free(self, self.x, self.y):
             self.y -= 1
 
 

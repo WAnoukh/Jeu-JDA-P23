@@ -2,6 +2,7 @@ import pygame as pg
 import sys
 from pygame.locals import *
 from Game import *
+from Texture import *
 
 pg.init()
 
@@ -21,15 +22,13 @@ my_font = pg.font.SysFont('Arial', 10)
 delta_time = 0
 
 
-
-
-
 # The main function that controls the game
 def main():
     global delta_time
     looping = True
     game = Game(WINDOW, WINDOW_WIDTH, WINDOW_HEIGHT)
     game.font = my_font
+
 
     # The main game loop
     while looping:
@@ -67,6 +66,5 @@ def main():
         game.Loop()
         pg.display.update()
         game.delta_time = fpsClock.tick(FPS) / 1000
-
 
 main()

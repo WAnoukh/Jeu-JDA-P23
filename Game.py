@@ -5,6 +5,7 @@ from functions import lerpDt, randomRange, clamp
 import pygame as pg
 from pygame.locals import *
 from random import random, randint
+from Texture import Texture_9Sided
 
 
 class Game:
@@ -27,11 +28,17 @@ class Game:
     allPlaced = False
     firstGeneration = True
 
+    wallTexture = None
+
     def __init__(self, window, WINDOW_WIDTH, WINDOW_HEIGHT):
         self.wasplaced = None
         self.WINDOW_WIDTH = WINDOW_WIDTH
         self.WINDOW_HEIGHT = WINDOW_HEIGHT
         self.WINDOW = window
+
+        self.wallTexturePath = ".\\9Sided_Wall.png"
+        self.wallTexture = Texture_9Sided(self.wallTexturePath, 6, 6,6,6)
+
         self.Start()
 
     def Start(self):
@@ -77,8 +84,8 @@ class Game:
         self.WINDOW.fill((170, 200, 255))
         i = 0
         for wall in self.walls:
-            wall.draw(self.WINDOW, self.MainCamera)
-        self.player.draw(self.WINDOW, self.MainCamera)
+            wall.Draw(self.WINDOW, self.MainCamera)
+        self.player.Draw(self.WINDOW, self.MainCamera)
 
         x, y = pg.mouse.get_pos()
         wx, wy = self.MainCamera.ScreenToWorld(x, y)
