@@ -55,6 +55,8 @@ class Game:
         firstWall = Wall(0, baseLevel, w, h, self, dy=baseLevel)
         self.firstGeneration = True
         self.GenerateFromWall(firstWall)
+        while not self.GenerateFromWall(firstWall):
+            pass
         for wall in self.walls:
             wall.StartMorph(1 * 1000)
         self.wasplaced = False
@@ -77,7 +79,7 @@ class Game:
                     wall.Update(self)
 
         # camera
-        #self.MainCamera.zoom = sin(pg.time.get_ticks() / 1000) * 0.5 + 1
+        # self.MainCamera.zoom = sin(pg.time.get_ticks() / 1000) * 0.5 + 1
         self.camDesiredX = lerpDt(self.camDesiredX, self.player.x, 0.9, self.delta_time * self.MainCamera.zoom)
         self.camDesiredY = lerpDt(self.camDesiredY, self.player.y, 0.9, self.delta_time * self.MainCamera.zoom)
         self.MainCamera.x = round(self.camDesiredX)
@@ -119,7 +121,13 @@ class Game:
             return self.newWalls[floor(randomRange(0, len(self.newWalls) - 1))]
 
         i = 0
+        tryCount = -1
+        failed = False
         while i < self.wallAmount:
+            tryCount += 1
+            if tryCount > self.wallAmount * 1000:
+                failed = True
+                break
             selectedWall = pickRandomWAll()
             # pick a side of the wall which we want to add a neighbor (0:leftside, 1:rightside, 2:topside)
             side = randint(0, 1)
@@ -157,6 +165,8 @@ class Game:
             self.newWalls.append(newWall)
             newWall.id = i + 1
             i += 1
+        if failed:
+            return False
         if self.firstGeneration:
             for i in range(len(self.newWalls)):
                 newWall = self.newWalls[i]
@@ -175,7 +185,8 @@ class Game:
         self.walls = self.newWalls.copy()
         self.allPlaced = False
         for wall in self.walls:
-            wall.StartMorph(1 * 1000)
+            wall.StartMorph(3 * 1000)
+        return True
 
     def Loop(self):
         self.Update()

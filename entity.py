@@ -257,12 +257,12 @@ class Player(Entity):
         while not game.place_free(self, self.x, self.y):
             self.y -= 1
 
-        if self.game.horizontalInput !=0:
+        if self.game.horizontalInput != 0:
             self.lastHorizontalInput = self.game.horizontalInput
 
     def Draw(self, window, camera):
         animSpeed = 0.2
-        #super().Draw(window, camera)
+        # super().Draw(window, camera)
         if self.landed:
             if self.xSpeed != 0:
                 curAnimation = self.runAnim
@@ -279,7 +279,6 @@ class Player(Entity):
                     curAnimation = self.fallAnim
         print(curAnimation)
 
-
         frame = curAnimation[floor(pg.time.get_ticks() / animSpeed / 1000) % len(curAnimation)]
         x, y = self.x, self.y
         x, y = camera.WorldToScreen(x, y)
@@ -287,8 +286,7 @@ class Player(Entity):
         w, h = frame.get_size()
         w, h = w * self.game.texturePixelScale * camera.zoom, h * self.game.texturePixelScale * camera.zoom
         frame = pygame.transform.flip(frame, self.lastHorizontalInput < 0, 0)
-        window.blit(pg.transform.scale_by(frame, self.game.texturePixelScale * camera.zoom),
-                    (x - w / 2, y - h))
+        window.blit(pg.transform.scale(frame, (w, h)), (x - w / 2, y - h))
 
 
 class Camera:
