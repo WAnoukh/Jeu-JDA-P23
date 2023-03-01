@@ -1,4 +1,4 @@
-from math import pow
+from math import pow, sqrt
 
 
 def sign(x):
@@ -43,6 +43,21 @@ def SmoothStep(t, t1, t2):
 
 def SmoothLerp(start, end, t, t1, t2):
     return lerp(start, end, SmoothStep(t, t1, t2))
+
+
+def Magnitude(x, y):
+    return sqrt(x * x + y * y)
+
+
+def Normalise(x, y):
+    if x == y == 0:
+        return 0, 0
+    mag = Magnitude(x, y)
+    return x / mag, y / mag
+
+
+def Distance2(x, y):
+    return x * x + y * y
 
 
 from random import random

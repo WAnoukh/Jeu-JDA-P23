@@ -1,4 +1,6 @@
 from math import ceil
+from random import randint
+
 import pygame as pg
 import pygame.transform
 
@@ -37,6 +39,9 @@ class Entity:
 
     def GetTopLeftPoint(self):
         return self.x - self.sizeX * self.pivotX, self.y - self.sizeY * self.pivotY
+
+    def GetCenter(self):
+        return self.x - 0.5 * self.sizeX, self.y - 0.5 * self.sizeY
 
     def PointCollide(self, x, y):
         wx, wy = self.GetTopLeftPoint()
@@ -186,16 +191,16 @@ class Player(Entity):
         # Jump
         if game.jumpKeyPRESSED:
             self.jumpRequested = True
-            if (pg.time.get_ticks() - self.lastWalled) / 1000 < self.wallJumpOffset and not self.landed:
-                self.ySpeed = -self.jumpForce
-                self.xSpeed = -self.wallJumpBoost * self.lastWallDir
-                self.jumpRequested = False
-                self.lastWalled = -100000
         elif game.jumpKeyRELEASED:
             self.jumpRequested = False
 
         if self.jumpRequested:
             timer = pg.time.get_ticks()
+            if (timer - self.lastWalled) / 1000 < self.wallJumpOffset and not self.landed:
+                self.ySpeed = -self.jumpForce
+                self.xSpeed = -self.wallJumpBoost * self.lastWallDir
+                self.jumpRequested = False
+                self.lastWalled = -100000
             if (timer - self.lastLanded) / 1000 < self.jumpOffset:
                 self.ySpeed = -self.jumpForce
                 self.jumpRequested = False
@@ -277,7 +282,6 @@ class Player(Entity):
                     curAnimation = self.jumpAnim
                 else:
                     curAnimation = self.fallAnim
-        print(curAnimation)
 
         frame = curAnimation[floor(pg.time.get_ticks() / animSpeed / 1000) % len(curAnimation)]
         x, y = self.x, self.y
@@ -287,6 +291,50 @@ class Player(Entity):
         w, h = w * self.game.texturePixelScale * camera.zoom, h * self.game.texturePixelScale * camera.zoom
         frame = pygame.transform.flip(frame, self.lastHorizontalInput < 0, 0)
         window.blit(pg.transform.scale(frame, (w, h)), (x - w / 2, y - h))
+
+
+class CheckPoint(Entity):
+    color = (0, 230, 0)
+    pivotY = 1
+    pivotX = 0.5
+
+    parentWall = None
+    sizeX = 15
+    sizeY = 15
+
+    def __init__(self, game):
+        super().__init__(0, 0, game)
+
+    def Start(self):
+        self.Replace()
+
+    def Replace(self):
+        selectedWall = None
+        maxDist = 0
+        for _ in range(6):
+            while True:
+                newWall = self.game.walls[randint(1, len(self.game.walls) - 1)]
+                if newWall is not self.parentWall:
+                    break
+            if Distance2(newWall.x - self.game.player.x, newWall.y - self.game.player.y) > maxDist:
+                selectedWall = newWall
+        self.parentWall = selectedWall
+
+    def Update(self, game):
+        if game.allPlaced:
+            if self.parentWall is None:
+                self.Replace()
+            x, y = self.GetTopLeftPoint()
+            if self.game.player.BoxCollide(x, y, self.x, self.y):
+                self.Replace()
+            self.x = self.parentWall.x
+            self.y = self.parentWall.y
+        else:
+            self.parentWall = None
+
+    def Draw(self, window, camera):
+        if self.game.allPlaced:
+            super().Draw(window, camera)
 
 
 class Camera:

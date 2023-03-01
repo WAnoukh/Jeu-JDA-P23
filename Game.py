@@ -1,7 +1,7 @@
 from math import floor, sin
 
-from entity import Camera, Player, Wall, Entity
-from functions import lerpDt, randomRange, clamp
+from entity import Camera, Player, Wall, Entity, CheckPoint
+from functions import lerpDt, randomRange, clamp, Normalise
 import pygame as pg
 from pygame.locals import *
 from random import random, randint
@@ -20,6 +20,8 @@ class Game:
 
     player = None
     MainCamera = None
+    checkpoint = None
+
     camDesiredX = None
     camDesiredY = None
     walls = []
@@ -54,14 +56,18 @@ class Game:
         w, h = self.wallTexture.GetSize(2, 1)
         firstWall = Wall(0, baseLevel, w, h, self, dy=baseLevel)
         self.firstGeneration = True
-        self.GenerateFromWall(firstWall)
         while not self.GenerateFromWall(firstWall):
             pass
         for wall in self.walls:
             wall.StartMorph(1 * 1000)
         self.wasplaced = False
 
+        self.checkpoint = CheckPoint(self)
+        self.checkpoint.Start()
+
     def Update(self):
+
+        self.checkpoint.Update(self)
 
         if self.allPlaced:
             self.player.Update(self)
@@ -101,6 +107,15 @@ class Game:
         place = self.place_free(testCollision, wx - 5, wy - 5)
         pg.draw.rect(self.WINDOW, (255 * place, 255 * (not place), 0), Rect(x - 10, y - 10, 10, 10))
 
+        if self.allPlaced:
+            self.checkpoint.Draw(self.WINDOW, self.MainCamera)
+            px, py = self.player.GetCenter()
+            cx, cy = self.checkpoint.GetCenter()
+            x, y = Normalise(cx - px, cy - py)
+            x, y = px + x * 20, py + y * 20
+            x, y = self.MainCamera.WorldToScreen(x, y)
+            pg.draw.rect(self.WINDOW, (0, 255, 0), Rect(x, y, 6, 6))
+
     def printTextOnScreen(self, text, x, y):
         img = self.font.render(str(text), True, (255, 0, 0))
         self.WINDOW.blit(img, (x, y))
@@ -131,7 +146,7 @@ class Game:
             selectedWall = pickRandomWAll()
             # pick a side of the wall which we want to add a neighbor (0:leftside, 1:rightside, 2:topside)
             side = randint(0, 1)
-            simulatedJumpLength = randomRange(0.2, 1.5)
+            simulatedJumpLength = randomRange(0.2, 1)
             x, y = selectedWall.GetDesiredTopLeftPoint()
             x += side * selectedWall.desiredSizeX
             xSpeed, ySpeed = 0, -self.player.jumpForce
@@ -154,9 +169,7 @@ class Game:
             w, h = randint(0, 10), randint(0, 20)
             if h == 0 or w == 0 and random() < 0.85:
                 w, h = randint(1, 10), randint(1, 20)
-            print(w, h)
             w, h = self.wallTexture.GetSize(w, h)
-            print(h, w)
             x, y = round(x), round(y)
             newWall = Wall(x, y, w + self.player.sizeX, h + self.player.sizeY,
                            self, dx=x, dy=y, dsx=w, dsy=h)
