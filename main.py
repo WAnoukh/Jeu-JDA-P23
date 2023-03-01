@@ -7,7 +7,7 @@ from Texture import *
 pg.init()
 
 # Game Setup
-FPS = 60
+FPS = 165
 fpsClock = pg.time.Clock()
 WINDOW_WIDTH = 1380
 WINDOW_HEIGHT = 1024
@@ -29,7 +29,6 @@ def main():
     game = Game(WINDOW, WINDOW_WIDTH, WINDOW_HEIGHT)
     game.font = my_font
 
-
     # The main game loop
     while looping:
         # Get inputs
@@ -40,7 +39,7 @@ def main():
                 pg.quit()
                 sys.exit()
             elif event.type == pg.KEYDOWN:
-                if event.key == pg.K_UP:
+                if event.key == pg.K_1:
                     game.jumpKeyDOWN = True
                     game.jumpKeyPRESSED = True
                 elif event.key == pg.K_RIGHT:
@@ -55,7 +54,7 @@ def main():
                     pg.quit()
                     sys.exit()
             elif event.type == pg.KEYUP:
-                if event.key == pg.K_UP:
+                if event.key == pg.K_1:
                     game.jumpKeyDOWN = False
                     game.jumpKeyRELEASED = True
                 elif event.key == pg.K_RIGHT:
@@ -66,5 +65,6 @@ def main():
         game.Loop()
         pg.display.update()
         game.delta_time = fpsClock.tick(FPS) / 1000
+
 
 main()

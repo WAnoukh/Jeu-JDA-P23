@@ -165,6 +165,9 @@ class Player(Entity):
 
     lastHorizontalInput = 1
 
+    animationStartTime = 0
+    lastAnimation = None
+
     def __init__(self, x, y, game):
         super().__init__(x, y, game)
         animations = ConvertPlayerSpriteSheet("SpriteSheet_Player.png")
@@ -280,16 +283,25 @@ class Player(Entity):
             else:
                 if self.ySpeed < 0:
                     curAnimation = self.jumpAnim
+                    animSpeed = 0.13
                 else:
                     curAnimation = self.fallAnim
 
-        frame = curAnimation[floor(pg.time.get_ticks() / animSpeed / 1000) % len(curAnimation)]
+        if self.lastAnimation != curAnimation:
+            self.animationStartTime = pg.time.get_ticks()
+            self.lastAnimation = curAnimation
+
+        frame = curAnimation[
+            floor((pg.time.get_ticks() - self.animationStartTime) / animSpeed / 1000) % len(curAnimation)]
         x, y = self.x, self.y
         x, y = camera.WorldToScreen(x, y)
 
         w, h = frame.get_size()
         w, h = w * self.game.texturePixelScale * camera.zoom, h * self.game.texturePixelScale * camera.zoom
-        frame = pygame.transform.flip(frame, self.lastHorizontalInput < 0, 0)
+        mirrored = self.lastHorizontalInput < 0
+        if curAnimation is self.slideAnim:
+            mirrored = not mirrored
+        frame = pygame.transform.flip(frame, mirrored, 0)
         window.blit(pg.transform.scale(frame, (w, h)), (x - w / 2, y - h))
 
 
