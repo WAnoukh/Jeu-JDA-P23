@@ -1,1 +1,1 @@
-{"name" : "JDA","desc" : "jda","author" : "dieu","category" : ["Solo","Arcade"]"executable" : "main.exe"	}
+{"name" : "ArcadiApocalypse","desc" : "Jeux de plateforme contre la montre dans lequel vous devez faire face à un bog de la borne qui la pousse à détruire l'utc !","author" : "Obelex, LouisL, Anoukh, TheKnightWhoSaysNI!, Bebel","category" : ["Solo","Arcade","Plateforme"],  "bindings" :  {    "joystick" : "Déplacement",    "red" : "Saut"  },  "preview" : "preview.png",  "executable" : "main.exe",  "arguments" : ""}
