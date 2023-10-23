@@ -1,4 +1,4 @@
-from math import pow, sqrt
+from math import pow, sqrt, pi, sin
 
 
 def sign(x):
@@ -65,3 +65,7 @@ from random import random
 
 def randomRange(a, b):
     return a + (b - a) * random()
+
+
+def CustomSin(a, b, f, time):
+    return (a + b) / 2 + sin(time * f * 2 * pi / 1000) * (b - a)

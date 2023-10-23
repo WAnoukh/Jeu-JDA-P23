@@ -1,4 +1,4 @@
-from math import ceil
+from math import ceil, sin
 from random import randint
 
 import pygame as pg
@@ -23,6 +23,8 @@ class Entity:
         self.x = x
         self.y = y
         self.game = game
+        self.sizeX //= game.texturePixelScale
+        self.sizeY //= game.texturePixelScale
 
     def Update(self, game):
         pass
@@ -41,7 +43,8 @@ class Entity:
         return self.x - self.sizeX * self.pivotX, self.y - self.sizeY * self.pivotY
 
     def GetCenter(self):
-        return self.x - 0.5 * self.sizeX, self.y - 0.5 * self.sizeY
+        x, y = self.GetTopLeftPoint()
+        return x + 0.5 * self.sizeX, y + 0.5 * self.sizeY
 
     def PointCollide(self, x, y):
         wx, wy = self.GetTopLeftPoint()
@@ -65,6 +68,7 @@ class Entity:
 
 
 class Wall(Entity):
+    startWall = False
     placed = True
     morphDuration = 2
     morphStart = 0
@@ -73,6 +77,10 @@ class Wall(Entity):
     startSizeX = 0
     startSizeY = 0
     texture = None
+
+    isLinkedToPlayer = False
+    playerRelativeX = 0
+    playerRelativeY = 0
 
     def __init__(self, x, y, sizeX, sizeY, game, dx=None, dy=None, dsx=None, dsy=None):
         super().__init__(x, y, game)
@@ -110,20 +118,29 @@ class Wall(Entity):
 
             self.x = SmoothLerp(self.startX, self.desiredX, curTime, self.morphStart, endTime)
             self.y = SmoothLerp(self.startY, self.desiredY, curTime, self.morphStart, endTime)
+
+            if self.isLinkedToPlayer:
+                game.player.x = self.x + self.playerRelativeX
+                game.player.y = self.y + self.playerRelativeY
+
             if self.sizeX != self.desiredSizeX:
                 self.sizeX = SmoothLerp(self.startSizeX, self.desiredSizeX, curTime, self.morphStart, endTime)
             if self.sizeY != self.desiredSizeY:
                 self.sizeY = SmoothLerp(self.startSizeY, self.desiredSizeY, curTime, self.morphStart, endTime)
+        else:
+            pass
+            # self.isLinkedToPlayer = False
 
     def Draw(self, window, camera):
+        if self.game.debug:
+            super().Draw(window, camera)
         sizeX, sizeY = self.sizeX * camera.zoom, self.sizeY * camera.zoom
         offsetX = sizeX * self.pivotX
         offsetY = sizeY * self.pivotY
         x, y = camera.WorldToScreen(self.x, self.y)
         x, y = x - offsetX, y - offsetY
         if self.texture is not None:
-            self.texture.Draw(window, x, y, self.sizeX, self.sizeY, camera)
-            self.game.printTextOnScreen(self.id, x, y)
+            self.texture.Draw(window, x, y, self.sizeX, self.sizeY)
         pass
 
     def GetDesiredTopLeftPoint(self):
@@ -134,20 +151,47 @@ class Wall(Entity):
         return (wx < x < wx + self.sizeX) and (wy < y < wy + self.sizeY)
 
 
+class DecorativeWAll(Entity):
+    texture = None
+
+    def __init__(self, game):
+        self.texture = game.decorativeWallTexture
+        self.x = randint(0, game.WINDOW_WIDTH)
+        self.y = randint(0, game.WINDOW_HEIGHT)
+        w, h = randint(1, 4), randint(1, 10)
+        super().__init__(self.x, self.y, game)
+        self.sizeX, self.sizeY = self.texture.GetSize(w, h)
+
+    def Update(self, game):
+        self.x += 50 * game.delta_time
+
+    def Draw(self, window, camera):
+        if self.game.debug:
+            super().Draw(window, camera)
+        sizeX, sizeY = self.sizeX * camera.zoom, self.sizeY * camera.zoom
+        offsetX = sizeX * self.pivotX
+        offsetY = sizeY * self.pivotY
+        x, y = self.x - offsetX, self.y - offsetY
+        if self.texture is not None:
+            self.texture.Draw(window, x, y, self.sizeX, self.sizeY)
+        pass
+
+
 class Player(Entity):
     pivotX = 0.5
     pivotY = 1
     color = (200, 0, 0)
-    sizeY = 12 * 2
-    sizeX = 9
+    sizeY = 12 * 4
+    sizeX = 9 * 2
 
     xSpeed = 0
     ySpeed = 0
 
     jumpRequested = False
 
-    landed = False
+    landed = True
     lastLanded = -5000
+    lastLandedWall = None
     jumpOffset = 0.1
     jumpForce = 800
     gravity = 1800
@@ -157,18 +201,29 @@ class Player(Entity):
     lastWalled = -5000
     lastWallDir = 0
     wallJumpOffset = 0.13
-    wallJumpBoost = 200
+    wallJumpBoost = 400
 
-    movSpeed = 400
+    movSpeed = 800
     movAcc = 0.2
     movDec = 0.3
 
     lastHorizontalInput = 1
 
+    animationStartTime = 0
+    lastAnimation = None
+
     def __init__(self, x, y, game):
         super().__init__(x, y, game)
-        animations = ConvertPlayerSpriteSheet("SpriteSheet_Player.png")
-        self.idleAnim, self.runAnim, self.jumpAnim, self.fallAnim, self.slideAnim = animations
+        self.normalAnim = ConvertPlayerSpriteSheet(game.execPath + "/SpriteSheet_Player.png",
+                                                   4 // game.texturePixelScale)
+        self.spaceAnim = ConvertPlayerSpriteSheet(game.execPath + "/SpriteSheet_Player_Astronaut.png",
+                                                  4 // game.texturePixelScale)
+        self.animations = self.normalAnim
+
+        self.movSpeed //= game.texturePixelScale
+        self.gravity //= game.texturePixelScale
+        self.jumpForce //= game.texturePixelScale
+        self.wallJumpBoost //= game.texturePixelScale
 
     def Update(self, game):
         # Landed
@@ -180,8 +235,12 @@ class Player(Entity):
         self.ySpeed += self.gravity * game.delta_time
 
         # Wall Slide
-        self.isWallTouching = (not game.place_free(self, self.x + 1, self.y)) - (
-            not game.place_free(self, self.x - 1, self.y))
+        left = game.place_free(self, self.x - 1, self.y)
+        right = game.place_free(self, self.x + 1, self.y)
+        if not left and not right:
+            self.isWallTouching = game.horizontalInput
+        else:
+            self.isWallTouching = (not right) - (not left)
         if self.isWallTouching != 0:
             self.lastWallDir = self.isWallTouching
             self.lastWalled = pg.time.get_ticks()
@@ -235,6 +294,8 @@ class Player(Entity):
                                      self.y + ySpeedDir * yStep):
                     xStep += 1
                 else:
+                    self.lastLandedWall = game.place_free(self, self.x + xSpeedDir * (xStep + 1),
+                                                          self.y + ySpeedDir * yStep, returnWall=True)
                     xDone = True
                     self.xSpeed = 0
 
@@ -246,9 +307,12 @@ class Player(Entity):
                                      self.y + ySpeedDir * (yStep + 1)):
                     yStep += 1
                 else:
+                    if self.ySpeed > 0:
+                        self.lastLandedWall = game.place_free(self, self.x + xSpeedDir * xStep,
+                                                              self.y + ySpeedDir * (yStep + 1), returnWall=True)
+
                     yDone = True
                     self.ySpeed = 0
-
             if xDone and yDone:
                 break
 
@@ -266,8 +330,11 @@ class Player(Entity):
             self.lastHorizontalInput = self.game.horizontalInput
 
     def Draw(self, window, camera):
+        if self.game.level == 3:
+            self.animations = self.spaceAnim
+
+        self.idleAnim, self.runAnim, self.jumpAnim, self.fallAnim, self.slideAnim = self.animations
         animSpeed = 0.2
-        # super().Draw(window, camera)
         if self.landed:
             if self.xSpeed != 0:
                 curAnimation = self.runAnim
@@ -280,17 +347,31 @@ class Player(Entity):
             else:
                 if self.ySpeed < 0:
                     curAnimation = self.jumpAnim
+                    animSpeed = 0.13
                 else:
                     curAnimation = self.fallAnim
 
-        frame = curAnimation[floor(pg.time.get_ticks() / animSpeed / 1000) % len(curAnimation)]
+        if self.lastAnimation != curAnimation:
+            self.animationStartTime = pg.time.get_ticks()
+            self.lastAnimation = curAnimation
+
+        if self.game.allPlaced:
+            frameI = floor((pg.time.get_ticks() - self.animationStartTime) / animSpeed / 1000) % len(curAnimation)
+        else:
+            frameI = 0
+
+        frame = curAnimation[frameI]
         x, y = self.x, self.y
         x, y = camera.WorldToScreen(x, y)
 
         w, h = frame.get_size()
-        w, h = w * self.game.texturePixelScale * camera.zoom, h * self.game.texturePixelScale * camera.zoom
-        frame = pygame.transform.flip(frame, self.lastHorizontalInput < 0, 0)
-        window.blit(pg.transform.scale(frame, (w, h)), (x - w / 2, y - h))
+        mirrored = self.lastHorizontalInput < 0
+        '''if curAnimation is self.slideAnim:
+            mirrored = not mirrored'''
+        frame = pygame.transform.flip(frame, mirrored, False)
+        window.blit(frame, (x - w / 2, y - h))
+        if self.game.debug:
+            super().Draw(window, camera)
 
 
 class CheckPoint(Entity):
@@ -299,11 +380,14 @@ class CheckPoint(Entity):
     pivotX = 0.5
 
     parentWall = None
-    sizeX = 15
-    sizeY = 15
+    sizeX = 10 * 4
+    sizeY = 8 * 4
+
+    texture = None
 
     def __init__(self, game):
         super().__init__(0, 0, game)
+        self.texture = ConvertSprite(self.game.execPath + "\checkpoint.png", self.game.texturePixelScale)
 
     def Start(self):
         self.Replace()
@@ -316,32 +400,116 @@ class CheckPoint(Entity):
                 newWall = self.game.walls[randint(1, len(self.game.walls) - 1)]
                 if newWall is not self.parentWall:
                     break
-            if Distance2(newWall.x - self.game.player.x, newWall.y - self.game.player.y) > maxDist:
+            dist = Distance2(newWall.desiredX - self.game.player.x, newWall.desiredY - self.game.player.y)
+            if dist > maxDist:
+                maxDist = dist
                 selectedWall = newWall
         self.parentWall = selectedWall
 
     def Update(self, game):
         if game.allPlaced:
-            if self.parentWall is None:
-                self.Replace()
             x, y = self.GetTopLeftPoint()
-            if self.game.player.BoxCollide(x, y, self.x, self.y):
-                self.Replace()
+            if self.game.player.BoxCollide(x, y, x + self.sizeX, y + self.sizeY):
+                game.CheckPointObtained()
             self.x = self.parentWall.x
-            self.y = self.parentWall.y
-        else:
-            self.parentWall = None
+            self.y = self.parentWall.y + (
+                    -4 - 3 * 4 + sin(pg.time.get_ticks() / 1000 * 2) * 8) / self.game.texturePixelScale
 
     def Draw(self, window, camera):
+
         if self.game.allPlaced:
+            if self.game.level == 2 and self.game.checkpointTook == self.game.checkpointBeforeTimeDecrease - 1:
+                sprite = self.game.player.spaceAnim[0][0]
+            else:
+                sprite = self.texture
+            x, y = self.GetTopLeftPoint()
+            x, y = camera.WorldToScreen(x, y)
+            window.blit(sprite, (x, y))
+            if self.game.debug:
+                super().Draw(window, camera)
+
+
+class Borne(Entity):
+    animation = []
+    morphStart = None
+    startX = None
+    startY = None
+    startSizeX = None
+    startSizeY = None
+
+    def __init__(self, x, y, game):
+        super().__init__(x, y, game)
+        self.animation = ConvertBorneSpriteSheet(game.execPath + "\\sprite_Borne.png", 4 // self.game.texturePixelScale)
+        self.desiredX = x
+        self.desiredY = y
+        self.placed = True
+        self.morphDuration = 1
+
+    def Draw(self, window, camera):
+        if self.game.debug:
             super().Draw(window, camera)
+        animSpeed = 0.5
+        frameI = floor((pg.time.get_ticks()) / animSpeed / 1000) % len(self.animation)
+        frame = self.animation[frameI]
+
+        x, y = self.x, self.y
+        x, y = camera.WorldToScreen(x, y)
+        y += CustomSin(0, 30, 0.5, pg.time.get_ticks())
+        w, h = frame.get_size()
+        window.blit(frame, (x - w / 2, y - h))
+
+    def StartMorph(self, duration=None):
+        self.placed = False
+        if duration is not None:
+            self.morphDuration = duration
+        else:
+            self.morphDuration = 1000
+        self.morphStart = pg.time.get_ticks()
+        self.startX = self.x
+        self.startY = self.y
+
+    def Update(self, game):
+        if not self.placed:
+            curTime = pg.time.get_ticks()
+            endTime = self.morphStart + self.morphDuration
+            if curTime >= endTime:
+                self.placed = True
+
+            self.x = SmoothLerp(self.startX, self.desiredX, curTime, self.morphStart, endTime)
+            self.y = SmoothLerp(self.startY, self.desiredY, curTime, self.morphStart, endTime)
+
+
+class Floater(Entity):
+    def __init__(self, x, y, game, xSpeed=0, ySpeed=0):
+        super(Floater, self).__init__(x, y, game)
+        self.xSpeed = xSpeed
+        self.ySpeed = ySpeed
+        self.setTexture("nuage_{}.png".format(randint(1, 2)))
+
+    def setTexture(self, path):
+        self.texture = ConvertSprite(self.game.execPath + "/" + path, 4 // self.game.texturePixelScale)
+
+    def Update(self, game):
+        self.x += self.xSpeed * game.delta_time
+        self.y += self.ySpeed * game.delta_time
+        self.x = ((self.x - game.player.x + game.WINDOW_WIDTH) % (game.WINDOW_WIDTH * 2)) + (
+                    game.player.x - game.WINDOW_WIDTH)
+
+    def Draw(self, window, camera):
+        w, h = self.texture.get_size()
+        x, y = (self.x - w * self.pivotX, self.y - h * self.pivotY)
+        x, y = camera.WorldToScreen(x, y)
+
+        window.blit(self.texture, (x, y))
+        if self.game.debug:
+            super(Floater, self).Draw(window, camera)
 
 
 class Camera:
     def __init__(self, x, y, WINDOW_WIDTH, WINDOW_HEIGHT):
         self.x = x
         self.y = y
-        self.zoom = 2
+        self.zoom = 1
         self.WINDOW_WIDTH = WINDOW_WIDTH
         self.WINDOW_HEIGHT = WINDOW_HEIGHT
 
