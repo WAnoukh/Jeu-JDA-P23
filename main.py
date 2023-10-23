@@ -8,6 +8,7 @@ import threading
 
 exitEvent = threading.Event()
 
+
 def GetAnimation(path, list):
     frames = []
     i = 29
@@ -22,6 +23,15 @@ def GetAnimation(path, list):
         i += 1
 
 
+def Quit():
+    pygame.mouse.set_visible(True)
+    pg.mouse.set_pos((WINDOW_WIDTH, WINDOW_HEIGHT))
+    pg.quit()
+    sys.exit()
+
+
+
+
 pg.init()
 
 # Game Setup
@@ -31,12 +41,13 @@ MainScale = 2
 WINDOW_WIDTH = 1380 // MainScale
 WINDOW_HEIGHT = 1024 // MainScale
 SCREENMODE = pg.RESIZABLE
-#SCREENMODE = pg.FULLSCREEN
+SCREENMODE = pg.FULLSCREEN + pg.SCALED + pg.NOFRAME
 WINDOW = pg.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), SCREENMODE, vsync=0)
 pg.display.set_caption('Runner')
 
 pg.font.init()
 fontDebug = pg.font.SysFont('Arial', 10)
+
 
 delta_time = 0
 
@@ -44,9 +55,9 @@ curentFrame = 0
 lastFrameTime = 0
 
 
-
 # The main function that controls the game
 def main():
+    pygame.mouse.set_visible(False)
     global delta_time
     looping = True
     textureScale = MainScale
@@ -64,16 +75,15 @@ def main():
         WINDOW.fill((0, 0, 0))
         game.printTextOnScreen(texts[int(i) % len(texts)], WINDOW_WIDTH - w - 30,
                                WINDOW_HEIGHT - h - 30, game.fontScore)
+        game.DrawSkipHint()
         for event in pg.event.get():
             if event.type == pg.KEYDOWN:
                 if event.key == pg.K_ESCAPE or event.key == pg.K_KP_ENTER or event.key == pg.K_RETURN or event.key == pg.K_BACKSPACE:
-                    pg.quit()
-                    sys.exit()
+                    Quit()
                 else:
                     exitEvent.set()
             if event.type == QUIT:
-                pg.quit()
-                sys.exit()
+                Quit()
         pg.display.update()
         fpsClock.tick()
 
@@ -86,22 +96,23 @@ def main():
         if i >= len(Anim):
             break
         WINDOW.blit(Anim[i], (0, 0))
-
+        game.DrawSkipHint()
         for event in pg.event.get():
             if event.type == pg.KEYDOWN:
                 if event.key == pg.K_ESCAPE or event.key == pg.K_KP_ENTER or event.key == pg.K_RETURN or event.key == pg.K_BACKSPACE:
-                    pg.quit()
-                    sys.exit()
+                    Quit()
                 else:
                     playing = False
             if event.type == QUIT:
-                pg.quit()
-                sys.exit()
+                Quit()
 
         pg.display.update()
         fpsClock.tick()
     Anim = []
-
+    game.verticalInput = 0
+    game.horizontalInput = 0
+    leftEverChanged = False
+    rightEverChanged = False
     # The main game loop
     while looping:
         # Get inputs
@@ -113,7 +124,6 @@ def main():
         game.bluePressed = False
         game.purplePressed = False
         for event in pg.event.get():
-
             if event.type == QUIT:
                 pg.quit()
                 sys.exit()
@@ -134,9 +144,11 @@ def main():
                     game.verticalInput -= 1
                     game.verticalKeyPressed = True
                 elif event.key == pg.K_RIGHT or event.key == pg.K_d:
+                    rightEverChanged = True
                     game.horizontalInput += 1
                     game.horizontalKeyPressed = True
                 elif event.key == pg.K_LEFT or event.key == pg.K_q:
+                    leftEverChanged = True
                     game.horizontalInput -= 1
                     game.horizontalKeyPressed = True
                 elif event.key == pg.K_SPACE:
@@ -151,9 +163,11 @@ def main():
                     game.jumpKeyDOWN = False
                     game.jumpKeyRELEASED = True
                 elif event.key == pg.K_RIGHT or event.key == pg.K_d:
-                    game.horizontalInput -= 1
+                    if rightEverChanged:
+                        game.horizontalInput -= 1
                 elif event.key == pg.K_LEFT or event.key == pg.K_q:
-                    game.horizontalInput += 1
+                    if leftEverChanged:
+                        game.horizontalInput += 1
                 elif event.key == pg.K_UP or event.key == pg.K_z:
                     game.verticalInput -= 1
                 elif event.key == pg.K_DOWN or event.key == pg.K_s:

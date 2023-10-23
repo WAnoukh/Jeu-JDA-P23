@@ -1,6 +1,6 @@
 from math import floor, sin, ceil, atan2, degrees
 
-from entity import Camera, Player, Wall, Entity, CheckPoint, Borne, DecorativeWAll
+from entity import Camera, Player, Wall, Entity, CheckPoint, Borne, DecorativeWAll, Floater
 from functions import lerpDt, randomRange, clamp, Normalise, Magnitude, SmoothLerp, SmoothStep, CustomSin
 import pygame as pg
 from pygame.locals import *
@@ -12,15 +12,15 @@ pg.font.init()
 
 
 class Game:
+    # Define "./games/ArcadiApocalypse" if you want to play on the Arcadia machine
     execPath = "./games/ArcadiApocalypse"
-    execPath = "."
 
     score = None
     scoreGain = None
     checkpointTook = None
     minRemainingTime = 10.0
     remainingTimeDecrease = 2.5
-    initialRemainingTime = minRemainingTime + remainingTimeDecrease*5
+    initialRemainingTime = minRemainingTime + remainingTimeDecrease * 5
     checkpointBeforeTimeDecrease = 5
     LevelTimeRemaining = initialRemainingTime
     remainingTime = LevelTimeRemaining
@@ -73,6 +73,10 @@ class Game:
 
     mainMenu = True
 
+    lastKnownPlayerPos = (0, 0)
+    lastKnownPlayerPosDate = 0
+    lastKnownPlayerPosRate = 2
+
     endMenu = False
     endMenuSince = 0
     endMenuY = 0
@@ -84,6 +88,11 @@ class Game:
     entryValuesCharLetter = " abcdefghijklmnopqrstuvwxyz"
     entryValuesCharMajLetter = entryValuesCharLetter.upper()
     entryValuesCharNum = " 0123456789"
+
+    lastCloudSpawn = 0
+    cloudSpawnDelay = (1/4)*1000
+
+    floaters = []
 
     def __init__(self, window, WINDOW_WIDTH, WINDOW_HEIGHT, texturePixelScale):
         self.texturePixelScale = texturePixelScale
@@ -122,10 +131,13 @@ class Game:
         self.level = 0
         self.deathAltitude = 1000 // self.texturePixelScale
         self.dead = False
+        self.floaters = []
 
         baseLevel = self.deathAltitude - 2000 // self.texturePixelScale
+        self.baseLevel = baseLevel
         self.player = Player(0, baseLevel, self)
         self.borne = Borne(0, baseLevel - 350 // self.texturePixelScale, self)
+        self.lastKnownPlayerPos = self.player.GetTopLeftPoint()
 
         self.MainCamera = Camera(self.player.x, self.player.y, self.WINDOW_WIDTH, self.WINDOW_HEIGHT)
         self.camDesiredX = self.player.x
@@ -133,9 +145,9 @@ class Game:
 
         w, h = self.wallTexture.GetSize(2, 1)
         self.walls = [Wall(0, baseLevel, w, h, self, dy=baseLevel)]
-
-        for i in range(self.decorativeWallAmount):
-            self.decorativeWall.append(DecorativeWAll(self))
+        self.walls[0].startWall = True
+        # for i in range(self.decorativeWallAmount):
+        #    self.decorativeWall.append(DecorativeWAll(self))
 
         self.camTarget = self.player
 
@@ -145,7 +157,7 @@ class Game:
         self.dead = False
         deathAltitude = 1000
         self.firstGeneration = True
-        #self.entryValues = [1, 14, 15, 14, 25, 13] + [0 for i in range(self.entryNumber - 3)]
+        # self.entryValues = [1, 14, 15, 14, 25, 13] + [0 for i in range(self.entryNumber - 3)]
         while not self.GenerateFromWall(self.walls[0]):
             pass
         for wall in self.walls:
@@ -161,9 +173,26 @@ class Game:
 
         self.checkpoint = CheckPoint(self)
         self.checkpoint.Start()
-        self.BorneStartMouvement()
+        self.BorneStartMovement()
+        self.lastCloudSpawn = pg.time.get_ticks()
 
     def Update(self):
+
+        '''while pg.time.get_ticks() > self.lastCloudSpawn + self.cloudSpawnDelay:
+            self.floaters.append(Floater(self.MainCamera.x - self.WINDOW_WIDTH *1.5, self.baseLevel + (random() - 0.5) * 500, self,
+                                         20 + (random() - 0.5) * 20, 0))
+            self.lastCloudSpawn += self.cloudSpawnDelay
+            print(self.cloudSpawnDelay,pg.time.get_ticks()-self.lastCloudSpawn)'''
+        maxfloaters = 30
+        if len(self.floaters) < maxfloaters :
+            self.floaters.append(Floater(80+(random()-0.5)*600000,self.baseLevel-2500+(random()-0.5)*4000,self,50+(random()-0.5)*30,0))
+        if(len(self.floaters) == maxfloaters):
+            f = Floater(80+(random()-0.5)*600000, self.baseLevel - 11000, self, 10, 0)
+            self.floaters.append(f)
+            f.setTexture("iss.png")
+        for floater in self.floaters:
+            floater.Update(self)
+
         if self.mainMenu:
             self.MainCamera.y = -1300 // self.texturePixelScale
             self.camDesiredY = self.MainCamera.y
@@ -241,6 +270,54 @@ class Game:
                     self.mainMenu = True
                     self.PreStart()
 
+    def DrawSkipHint(self):
+        font = self.fontButton
+        text = "Appuyez sur n'importe quel bouton pour passer le chargement/la cinematique."
+        w, h = font.size(text)
+
+        s = pg.Surface((w + 8, h + 8), pg.SRCALPHA)  # per-pixel alpha
+        s.fill((0, 0, 0, 200))  # notice the alpha value in the color
+        x, y = (self.WINDOW_WIDTH / 2, self.WINDOW_HEIGHT * 0.05)
+        self.WINDOW.blit(s, (x - w / 2 - 4, y - h / 2 - 4))
+        self.printTextOnScreen(text, x - w / 2, y - h / 2, font=font)
+
+    def DrawMinimap(self, size):
+        zoom = 0.1
+        moyX, moyY = 0, 0
+        margin = 10
+        for wall in self.walls:
+            x, y = wall.GetTopLeftPoint()
+            moyX += x
+            moyY += y
+        moyX /= len(self.walls)
+        moyY /= len(self.walls)
+
+        def ConvertToMap(vx, vy):
+            return (vx - moyX) * zoom + margin * 6 + size / 2, (
+                    vy - moyY) * zoom + self.WINDOW_HEIGHT - margin - size / 2
+
+        for wall in self.walls:
+            color = (0, 0, 0, 150)
+            if wall is self.player.lastLandedWall or (not self.allPlaced and wall.startWall):
+                color = (0, 255, 0, 150)
+            elif wall is self.checkpoint.parentWall:
+                color = (255, 0, 0, 150)
+            elif self.level >= 3:
+                color = (255, 255, 255, 150)
+            x, y = wall.GetTopLeftPoint()
+            x, y = ConvertToMap(x, y)
+            sX, sY = wall.sizeX * zoom, wall.sizeY * zoom
+            s = pg.Surface((sX, sY), pg.SRCALPHA)  # per-pixel alpha
+            s.fill(color)  # notice the alpha value in the color
+            self.WINDOW.blit(s, (x, y))
+        s = pg.Surface((4, 4), pg.SRCALPHA)  # per-pixel alpha
+        s.fill((255, 0, 0, 150))  # notice the alpha value in the color
+        if pg.time.get_ticks() > self.lastKnownPlayerPosDate + self.lastKnownPlayerPosRate * 1000:
+            self.lastKnownPlayerPos = self.player.GetTopLeftPoint()
+            self.lastKnownPlayerPosDate = pg.time.get_ticks()
+        px, py = self.lastKnownPlayerPos
+        # self.WINDOW.blit(s, ConvertToMap(px, py))
+
     def DrawBG(self):
         text = self.BGTexture
         self.WINDOW.fill((255, 255, 255))
@@ -264,6 +341,7 @@ class Game:
 
     def Draw(self):
         self.DrawBG()
+
 
         if self.mainMenu:
             s = pg.Surface((255, 90), pg.SRCALPHA)  # per-pixel alpha
@@ -295,8 +373,12 @@ class Game:
             self.printTextOnScreen(partialTitle, (self.WINDOW_WIDTH - w) / 2, self.WINDOW_HEIGHT * 0.1, font=font,
                                    color=(255, 183, 62))
 
+        for floater in self.floaters:
+            floater.Draw(self.WINDOW, self.MainCamera)
+
         if not self.dead:
             self.player.Draw(self.WINDOW, self.MainCamera)
+
         for wall in self.walls:
             wall.Draw(self.WINDOW, self.MainCamera)
 
@@ -327,15 +409,13 @@ class Game:
                     self.WINDOW.blit(rotated_image, (x - w / 2, y - h / 2))
                     if self.debug:
                         pg.draw.rect(self.WINDOW, (0, 255, 0), Rect(x, y, 6, 6))
-
+            scoreToBeat, top = self.scoreBoard.NextScore(self.score)
             if not self.dead:
-                scoreToBeat, top = self.scoreBoard.NextScore(self.score)
                 scoreText = "Score: " + '{:,}'.format(self.score).replace(",", " ") + " (Top {})".format(top)
                 w = self.fontScore.size(scoreText)[0]
-                s = pg.Surface((w+8, 90), pg.SRCALPHA)  # per-pixel alpha
+                s = pg.Surface((w + 8, 90), pg.SRCALPHA)  # per-pixel alpha
                 s.fill((0, 0, 0, 100))  # notice the alpha value in the color
                 self.WINDOW.blit(s, (2, 10))
-
 
                 # self.DrawScoreBoard(self.WINDOW_WIDTH, 50 // self.texturePixelScale, True, True)
 
@@ -356,6 +436,7 @@ class Game:
                 self.printTextOnScreen("{:.2f}".format(self.remainingTime), 10 // self.texturePixelScale,
                                        115 // self.texturePixelScale, font=self.fontScore)
 
+                self.DrawMinimap(200)
 
         if self.borne is not None:
             self.borne.Draw(self.WINDOW, self.MainCamera)
@@ -372,7 +453,7 @@ class Game:
             self.printTextOnScreen("Game Over", self.WINDOW_WIDTH / 2 - fw / 2,
                                    y + 120 // self.texturePixelScale - fh / 2, font=font)
             font = self.fontScore
-            text = "Votre score: {}".format(self.score)
+            text = "Votre score: {}".format(self.score) + " (Top {})".format(top)
             fw2, fh2 = font.size(text)
             self.printTextOnScreen(text, self.WINDOW_WIDTH / 2 - fw2 / 2,
                                    y + 25 // self.texturePixelScale + fh - fh2 / 2, font=font)
@@ -382,42 +463,55 @@ class Game:
             entrySpace = 30 // self.texturePixelScale
             entryY = 790 // self.texturePixelScale + self.endMenuY
             entryTotalW = entryW * self.entryNumber + entrySpace * (self.entryNumber - 1)
+            if top <= 5:
+                text = "Entrez votre nom:"
 
-            text = "Entrez votre nom:"
+                self.printTextOnScreen(text, self.WINDOW_WIDTH / 2 - entryTotalW / 2,
+                                       entryY - 85 // self.texturePixelScale,
+                                       font=font)
 
-            self.printTextOnScreen(text, self.WINDOW_WIDTH / 2 - entryTotalW / 2, entryY - 85 // self.texturePixelScale,
-                                   font=font)
+                for i in range(self.entryNumber):
+                    x = self.WINDOW_WIDTH / 2 - entryTotalW / 2 + i * (entryW + entrySpace)
+                    y = entryY
+                    if self.entrySelected == i:
+                        size = CustomSin(15 // self.texturePixelScale, 20 // self.texturePixelScale, 1,
+                                         pg.time.get_ticks())
+                        pg.draw.rect(self.WINDOW, (200, 50, 50),
+                                     Rect(x - size, y - size, entryW + size * 2, entryH + size * 2))
+                    pg.draw.rect(self.WINDOW, (50, 50, 50), Rect(x, y, entryW, entryH))
+                    font = self.fontScore
+                    text = self.GetEntryValue(i)
+                    fw, fh = font.size(text)
+                    self.printTextOnScreen(text, x + entryW / 2 - fw / 2, y + entryH / 2 - fh / 2, font=font)
 
-            for i in range(self.entryNumber):
-                x = self.WINDOW_WIDTH / 2 - entryTotalW / 2 + i * (entryW + entrySpace)
-                y = entryY
-                if self.entrySelected == i:
-                    size = CustomSin(15 // self.texturePixelScale, 20 // self.texturePixelScale, 1, pg.time.get_ticks())
-                    pg.draw.rect(self.WINDOW, (200, 50, 50),
-                                 Rect(x - size, y - size, entryW + size * 2, entryH + size * 2))
-                pg.draw.rect(self.WINDOW, (50, 50, 50), Rect(x, y, entryW, entryH))
-                font = self.fontScore
-                text = self.GetEntryValue(i)
-                fw, fh = font.size(text)
-                self.printTextOnScreen(text, x + entryW / 2 - fw / 2, y + entryH / 2 - fh / 2, font=font)
-
-            # self.WINDOW.blit(self.blueImg, (self.WINDOW_WIDTH / 2 -tw/2, self.WINDOW_HEIGHT * 0.7))
-            buttonInfo = [("Bouton vert: Majuscules", self.greenImg), ("Bouton bleu: Chiffres", self.blueImg),
-                          ("Bouton violet: Valider", self.purpleImg)]
-            i = 0
-            font = self.fontButton
-            accx = 0
-            for text, img in buttonInfo:
+                # self.WINDOW.blit(self.blueImg, (self.WINDOW_WIDTH / 2 -tw/2, self.WINDOW_HEIGHT * 0.7))
+                buttonInfo = [("Bouton vert: Majuscules", self.greenImg), ("Bouton bleu: Chiffres", self.blueImg),
+                              ("Bouton violet: Valider", self.purpleImg)]
+                i = 0
+                font = self.fontButton
+                accx = 0
+                for text, img in buttonInfo:
+                    x, y = 50 // self.texturePixelScale, self.WINDOW_HEIGHT * 0.94 + self.endMenuY
+                    self.WINDOW.blit(img, (x + accx, y))
+                    textMargin = 40 // self.texturePixelScale
+                    self.printTextOnScreen(text, x + accx + textMargin, y + 4 // self.texturePixelScale, font=font)
+                    accx += img.get_size()[0] + textMargin + font.size(text)[0]
+                    i += 1
+            else:
+                text = "Bouton violet: Valider"
+                img = self.purpleImg
+                font = self.fontButton
+                w = font.size(text)[0]
+                #self.printTextOnScreen(text, (self.WINDOW_WIDTH-w)/2, self.WINDOW_HEIGHT*0.9, font=font)
                 x, y = 50 // self.texturePixelScale, self.WINDOW_HEIGHT * 0.94 + self.endMenuY
-                self.WINDOW.blit(img, (x + accx, y))
                 textMargin = 40 // self.texturePixelScale
-                self.printTextOnScreen(text, x + accx + textMargin, y + 4 // self.texturePixelScale, font=font)
-                accx += img.get_size()[0] + textMargin + font.size(text)[0]
-                i += 1
+                w += textMargin + self.purpleImg.get_width()
+                self.WINDOW.blit(img, ((self.WINDOW_WIDTH-w) / 2 , y))
+                self.printTextOnScreen(text,  (self.WINDOW_WIDTH-w + textMargin + self.purpleImg.get_width())/2, y + 4 // self.texturePixelScale, font=font)
 
             self.DrawScoreBoard(self.WINDOW_WIDTH / 2 - entryTotalW / 2, self.endMenuY + 270 // self.texturePixelScale)
 
-        self.printTextOnScreen(1 / self.delta_time, 0, 0, color=(255, 0, 0))
+        # self.printTextOnScreen(1 / self.delta_time, 0, 0, color=(255, 0, 0))
 
     def DrawScoreBoard(self, x, y, small=False, leftAlign=True):
         color = (200, 200, 200)
@@ -472,7 +566,7 @@ class Game:
             self.SpawnEndMenu()
             self.dead = True
 
-    def BorneStartMouvement(self):
+    def BorneStartMovement(self):
         self.borne.desiredX = self.checkpoint.parentWall.desiredX
         self.borne.desiredY = self.checkpoint.parentWall.desiredY - 130
         self.borne.StartMorph(3 * 1000)
@@ -490,10 +584,15 @@ class Game:
                 self.LevelTimeRemaining = max(self.minRemainingTime,
                                               self.LevelTimeRemaining - self.remainingTimeDecrease)
             self.scoreGain = int(pow(self.scoreGain, 1.02))
+        else:
+            for wall in self.walls:
+                if wall is self.checkpoint.parentWall:
+                    wall.startWall = True
+                else:
+                    wall.startWall = False
         self.remainingTime = self.LevelTimeRemaining
         self.checkpoint.Replace()
-        self.BorneStartMouvement()
-
+        self.BorneStartMovement()
 
     def printTextOnScreen(self, text, x, y, font=None, color=(255, 255, 255)):
         if font is None:
@@ -501,14 +600,20 @@ class Game:
         img = font.render(str(text), True, color)
         self.WINDOW.blit(img, (x, y))
 
-    def place_free(self, entity, x, y, newWalls=False):
+    def place_free(self, entity, x, y, newWalls=False, returnWall=False):
         x -= entity.pivotX * entity.sizeX
         y -= entity.pivotY * entity.sizeY
         for wall in self.newWalls if newWalls else self.walls:
             if id(entity) != id(wall):
                 if wall.BoxCollide(x, y, x + entity.sizeX, y + entity.sizeY):
-                    return False
-        return True
+                    if returnWall:
+                        return wall
+                    else:
+                        return False
+        if returnWall:
+            return None
+        else:
+            return True
 
     def GenerateFromWall(self, inWall):
         if not self.firstGeneration:
@@ -520,6 +625,7 @@ class Game:
         wall.isLinkedToPlayer = True
         wall.playerRelativeX = self.player.x - inWall.x
         wall.playerRelativeY = self.player.y - inWall.y
+        wall.startWall = True
         self.newWalls = [wall]
         index = self.walls.index(inWall)
         self.walls.insert(0, self.walls.pop(index))
@@ -591,6 +697,10 @@ class Game:
             for i in range(len(self.newWalls)):
                 newWall = self.newWalls[i]
                 oldWall = self.walls[i]
+                if i == 0:
+                    newWall.startWall = True
+                else:
+                    newWall.startWall = False
                 newWall.x = oldWall.x
                 newWall.y = oldWall.y
                 newWall.sizeX = oldWall.sizeX

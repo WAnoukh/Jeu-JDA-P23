@@ -1,0 +1,3 @@
+Demander le nom si dans le top 5 ok
+donner le top dans le menu de fin ok
+quand pas dans le top 5 faire un rappel des controles. non

@@ -68,6 +68,7 @@ class Entity:
 
 
 class Wall(Entity):
+    startWall = False
     placed = True
     morphDuration = 2
     morphStart = 0
@@ -190,6 +191,7 @@ class Player(Entity):
 
     landed = True
     lastLanded = -5000
+    lastLandedWall = None
     jumpOffset = 0.1
     jumpForce = 800
     gravity = 1800
@@ -292,6 +294,8 @@ class Player(Entity):
                                      self.y + ySpeedDir * yStep):
                     xStep += 1
                 else:
+                    self.lastLandedWall = game.place_free(self, self.x + xSpeedDir * (xStep + 1),
+                                                          self.y + ySpeedDir * yStep, returnWall=True)
                     xDone = True
                     self.xSpeed = 0
 
@@ -303,9 +307,12 @@ class Player(Entity):
                                      self.y + ySpeedDir * (yStep + 1)):
                     yStep += 1
                 else:
+                    if self.ySpeed > 0:
+                        self.lastLandedWall = game.place_free(self, self.x + xSpeedDir * xStep,
+                                                              self.y + ySpeedDir * (yStep + 1), returnWall=True)
+
                     yDone = True
                     self.ySpeed = 0
-
             if xDone and yDone:
                 break
 
@@ -399,11 +406,10 @@ class CheckPoint(Entity):
                 selectedWall = newWall
         self.parentWall = selectedWall
 
-
     def Update(self, game):
         if game.allPlaced:
             x, y = self.GetTopLeftPoint()
-            if self.game.player.BoxCollide(x, y, self.x, self.y):
+            if self.game.player.BoxCollide(x, y, x + self.sizeX, y + self.sizeY):
                 game.CheckPointObtained()
             self.x = self.parentWall.x
             self.y = self.parentWall.y + (
@@ -471,6 +477,33 @@ class Borne(Entity):
 
             self.x = SmoothLerp(self.startX, self.desiredX, curTime, self.morphStart, endTime)
             self.y = SmoothLerp(self.startY, self.desiredY, curTime, self.morphStart, endTime)
+
+
+class Floater(Entity):
+    def __init__(self, x, y, game, xSpeed=0, ySpeed=0):
+        super(Floater, self).__init__(x, y, game)
+        self.xSpeed = xSpeed
+        self.ySpeed = ySpeed
+        self.setTexture("nuage_{}.png".format(randint(1, 2)))
+
+    def setTexture(self, path):
+        self.texture = ConvertSprite(self.game.execPath + "/" + path, 4 // self.game.texturePixelScale)
+
+    def Update(self, game):
+        self.x += self.xSpeed * game.delta_time
+        self.y += self.ySpeed * game.delta_time
+        self.x = ((self.x - game.player.x + game.WINDOW_WIDTH) % (game.WINDOW_WIDTH * 2)) + (
+                    game.player.x - game.WINDOW_WIDTH)
+
+    def Draw(self, window, camera):
+        w, h = self.texture.get_size()
+        x, y = (self.x - w * self.pivotX, self.y - h * self.pivotY)
+        x, y = camera.WorldToScreen(x, y)
+
+        window.blit(self.texture, (x, y))
+        if self.game.debug:
+            super(Floater, self).Draw(window, camera)
+
 
 class Camera:
     def __init__(self, x, y, WINDOW_WIDTH, WINDOW_HEIGHT):

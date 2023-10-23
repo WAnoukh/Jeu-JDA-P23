@@ -1,6 +1,9 @@
+import datetime
+
 from PIL import Image
 import json
-
+import os
+from datetime import date
 
 class Score:
     score = None
@@ -40,6 +43,12 @@ class ScoreBoard:
         with f as outfile:
             json.dump(convertedScore, outfile)
         f.close()
+        sauvpath = self.path+"_sauv_"+str(date.today())+"-H"+str(datetime.datetime.today().hour)
+        if not os.path.isfile(sauvpath):
+            f = open(sauvpath, "w")
+            with f as outfile:
+                json.dump(convertedScore, outfile)
+            f.close()
 
     def NextScore(self, score):
         i = -1
@@ -57,8 +66,18 @@ class ScoreBoard:
         except:
             self.StoreScore()
             f = open(self.path, "r")
-        ls = json.load(f)
-        f.close()
+        try :
+            ls = json.load(f)
+            f.close()
+        except:
+            f.close()
+            f = open(self.path, "a+")
+            f.write('[{"Score": 999999999999, "UserName": "FileCorruptedCallAdmin"}]')
+            f.close()
+            f = open(self.path, "r")
+            ls = json.load(f)
+            f.close()
+
         for dic in ls:
             newScore = Score(dic["Score"], dic["UserName"])
             self.AddScore(newScore, store=False)
